@@ -3,6 +3,9 @@
 import SeleniumControl
 import time
 import random
+import codecs
+
+
 class Palantir:
     def __init__(self):
         self.s = SeleniumControl.SeleniumControl()
@@ -28,38 +31,50 @@ class Palantir:
         
         # If there are no social media links:
         
-        twitterlink = "notwitter"
-        facebooklink = "nofacebook"
+        twitterlink = "no twitter"
+        facebooklink = "no facebook"
 
         linkstring = ""
         for x in links:
             if x.find("twitter") != -1:
-                twitterlink = x
+                twitterlink = self.makeLink(x)
             elif x.find("facebook") != -1:
-                facebooklink = x
+                facebooklink = self.makeLink(x)
             
             else:
-                linkstring = linkstring + ";" + x
+                linkstring += ";" + self.makeLink(x)
         linkstring = linkstring[1:]
         
-        hasemail = self.hasEmail()         
+        hasemail = self.hasEmail()
+
+	country = self.getCountry()
         
-        savestring = channel + "," + str(subs) + "," + linkstring + "," + twitterlink + "," + facebooklink + "," + hasemail
+        savestring = u"" + self.makeLink(channel) + u"," + country + u"," + unicode(subs) + u"," + unicode(hasemail) + u"," + unicode(facebooklink) + u"," + unicode(twitterlink) + u"," + unicode(linkstring)
         
         self.saveLink(savestring)
-    
+
+    def makeLink(self, x):
+        return u"=HIPERŁĄCZE(\"%s\")" % x
     
     # This is really important. You have to input
     # the string on the mail label here.
     
     def hasEmail(self):
-        if self.s.driver.page_source.find(u"View email address") != -1:
+        if self.s.driver.page_source.find(u"Wyświetl adres e-mail") != -1 or \
+	   self.s.driver.page_source.find(u"View email address") != -1:
             return "has email"
         return "no email"
    
+    def getCountry(self):
+        country = self.s.driver.find_elements_by_class_name("country-inline")
+	if len(country) > 0:
+	    country = u", ".join(c.text for c in country)
+	else:
+	    country = u"no country"
+	return country
    
-   # Gets all the links from about section.
-   def getLinks(self):
+    # Gets all the links from about section.
+    def getLinks(self):
         links = []
         el = self.s.driver.find_elements_by_class_name("about-channel-link")
         for x in el:
@@ -85,15 +100,10 @@ class Palantir:
 
     # File I/O
     def saveLink(self,link):
-        f = open("data/YoutubeChannelsParsed.Oink",'a')
+        f = codecs.open("data/YoutubeChannelsParsed.Oink",'a', "utf-8")
         f.write(link+"\n")
         f.close()
         
-    
-            
-    
-
-
 
 p = Palantir()
 f = open("data/YoutubeChannels.Oink",'r')
@@ -107,8 +117,4 @@ for x in range(0, len(channels)):
     print i
     p.browseChannel(channels[x])
     i = i + 1
-    
-
-        
-        
 

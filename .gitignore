@@ -47,5 +47,9 @@ Temporary Items
 .apdisk
 
 # Python related files
-.pyc
-.pyd
+*.pyc
+*.pyd
+
+venv
+data
+chromedriver.exe
