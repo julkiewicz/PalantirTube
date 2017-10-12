@@ -50,6 +50,9 @@ Temporary Items
 *.pyc
 *.pyd
 
+# IntelliJ
+.idea
+
 venv
 data
 chromedriver.exe
