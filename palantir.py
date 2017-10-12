@@ -79,7 +79,7 @@ class OutputItem(WorkItem):
         return type(self) == type(other) and self.queue == other.queue and self.output == other.output
 
     def __ne__(self, other):
-        return type(self) != type(other) or self.output != other.output
+        return type(self) != type(other) or self.queue != other.queue or self.output != other.output
 
     def __hash__(self):
         return hash(self.queue) * 13 + hash(self.output)
