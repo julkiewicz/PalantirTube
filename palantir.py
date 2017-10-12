@@ -14,34 +14,6 @@ from selenium import webdriver
 from frozendict import frozendict
 
 
-class LinkDatabase(object):
-
-    def __init__(self, filename):
-        self.filename = filename
-        self.data = set()
-        self.refresh()
-
-    def refresh(self):
-        self.data = set()
-        with open(self.filename, 'rb') as file:
-            reader = csv.reader(file)
-            for row in reader:
-                link = row[0]
-                self.save_link(link)
-
-    def _normalize_link(self, link):
-        link = link.lower().strip()
-        return link
-
-    def save_link(self, link):
-        link = self._normalize_link(link)
-        self.data.add(link)
-
-    def has_link(self, link):
-        link = self._normalize_link(link)
-        return link in self.data
-
-
 class WorkItem(object):
 
     def __init__(self, queue):
@@ -366,7 +338,6 @@ def crawl(search_term, page_count, database):
     for item in crawler.crawl():
         database.add_result(item.output)
     database.sort_by(YoutubeChannelCrawler.SUB_COUNT_COLUMN, reverse=True)
-    return database
 
 
 def save_as_csv(output_file, database):
@@ -393,7 +364,6 @@ def main():
     d = {}
 
     def save_results():
-        logging.info(u"Handling signal")
         if d.get('already_saved'):
             return
         d['already_saved'] = True
@@ -408,10 +378,10 @@ def main():
     try:
         crawl(args.search_term, args.page_count, database)
     finally:
-        save_results()
+        signal.signal(signal.SIGINT, original_sigint)
+        signal.signal(signal.SIGTERM, original_sigterm)
 
-    signal.signal(signal.SIGINT, original_sigint)
-    signal.signal(signal.SIGTERM, original_sigterm)
+        save_results()
 
 
 if __name__ == "__main__":
