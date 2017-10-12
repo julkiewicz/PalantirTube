@@ -91,26 +91,33 @@ class Crawler(object):
         self.driver = driver
         self.queue = deque()
         self.already_processed = set()
+        self.total_count = 0
+        self.processed_count = 0
 
     def crawl(self):
-        logging.info(u"Started crawling")
+        logging.debug(u"Started crawling")
         for item in self._get_start_items():
-            logging.info(u"Start item: " + repr(item))
+            logging.debug(u"Start item: " + repr(item))
             if self._is_result_item(item):
                 yield item
             else:
                 self._push_item(item)
         while len(self.queue) > 0:
+            logging.info(u"Progress: %.1f%%" % self._get_progress())
             item = self._pop_item()
-            logging.info(u"Processing item: " + repr(item))
-            if item.is_link():
-                self.driver.get(item.link)
             for new_item in self._process_item(item):
-                logging.info(u"New item: " + repr(new_item))
+                logging.debug(u"New item: " + repr(new_item))
                 if self._is_result_item(new_item):
                     yield new_item
                 else:
                     self._push_item(new_item)
+        logging.info(u"Progress: %.1f%%" % self._get_progress())
+
+    def _get_progress(self):
+        if self.total_count == 0:
+            return 100.0
+        else:
+            return self.processed_count * 100.0 / float(self.total_count)
 
     def _pop_item(self):
         return self.queue.popleft()
@@ -120,6 +127,7 @@ class Crawler(object):
             return
         self.already_processed.add(item)
         self.queue.append(item)
+        self.total_count += 1
 
     def _is_result_item(self, item):
         return item.queue == 'result'
@@ -128,6 +136,13 @@ class Crawler(object):
         raise NotImplementedError()
 
     def _process_item(self, item):
+        logging.debug(u"Processing item: " + repr(item))
+        if item.is_link():
+            self.driver.get(item.link)
+        self.processed_count += 1
+        return self._process_item_inner(item)
+
+    def _process_item_inner(self, item):
         if True:
             raise NotImplementedError()
         yield
@@ -145,7 +160,7 @@ class YoutubeChannelCrawler(Crawler):
         link = urlparse.urlunparse(('https', 'www.youtube.com', '/results', '', params, ""))
         yield LinkItem('result_list', link)
 
-    def _process_item(self, item):
+    def _process_item_inner(self, item):
         if item.queue == 'result_list':
             for item in self._process_result_list(item):
                 yield item
@@ -277,7 +292,7 @@ class YoutubeChannelCrawler(Crawler):
         return self.driver.find_elements_by_xpath("//a[starts-with(@href,'/watch?')]")
 
     def _get_channel_elems(self):
-        return self.driver.find_elements_by_xpath("//a[starts-with(@href,'/user/')]")
+        return self.driver.find_elements_by_xpath("//a[starts-with(@href,'/user/') or starts-with(@href, '/channel/')]")
 
     def _next_page(self):
         self.driver.execute_script("window.scrollBy(0,1000)", "")
@@ -317,7 +332,10 @@ class ResultDatabase(object):
         assert name in self.column_set
         self.results.sort(key=lambda r: r.get(name), reverse=reverse)
 
-    def as_csv(self):
+    def as_csv(self, header=True):
+        if header:
+            yield self.columns
+
         for r in self.results:
             row = []
             for c in self.columns:
@@ -348,9 +366,11 @@ def save_as_csv(output_file, database):
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
-
     parser = ArgumentParser()
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+                        help="print progress while parsing")
+    parser.add_argument("-vv", "--very-verbose", dest="very_verbose", action="store_true",
+                        help="print internal crawler parsing progress")
     parser.add_argument("-o", "--output", dest="output_file",
                         help="write output to FILE", metavar="FILE")
     parser.add_argument("-s", "--search", dest="search_term",
@@ -361,13 +381,18 @@ def main():
     args = parser.parse_args()
     database = create_database()
 
+    if args.very_verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    elif args.verbose:
+        logging.basicConfig(level=logging.INFO)
+
     d = {}
 
     def save_results():
         if d.get('already_saved'):
             return
         d['already_saved'] = True
-        logging.info(u"Saving to CSV")
+        logging.debug(u"Saving to CSV")
         save_as_csv(args.output_file, database)
 
     original_sigint = signal.getsignal(signal.SIGINT)
